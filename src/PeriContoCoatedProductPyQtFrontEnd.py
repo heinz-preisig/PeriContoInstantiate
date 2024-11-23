@@ -8,14 +8,20 @@ refs:  https://github.com/RDFLib/rdflib/blob/main/examples/conjunctive_graphs.py
 """
 
 import os
+import sys
 from collections import OrderedDict
 
-from PyQt5 import QtGui
-from PyQt5.QtCore import pyqtSlot
-from PyQt5.QtWidgets import QApplication
-from PyQt5.QtWidgets import QFileDialog
-from PyQt5.QtWidgets import QMainWindow
-from PyQt5.QtWidgets import QTreeWidgetItem
+from PyQt6 import QtGui, QtCore
+from PyQt6.QtWidgets import *
+
+root = os.path.abspath(os.path.join("."))
+sys.path.extend([root, os.path.join(root, "resources")])
+# from PyQt5 import QtGui
+# from PyQt5.QtCore import pyqtSlot
+# from PyQt5.QtWidgets import QApplication
+# from PyQt5.QtWidgets import QFileDialog
+# from PyQt5.QtWidgets import QMainWindow
+# from PyQt5.QtWidgets import QTreeWidgetItem
 
 from PeriContoCoatedProductTreeBackEnd import BackEnd
 from PeriContoCoatedProductTreeBackEnd import DELIMITERS
@@ -23,6 +29,8 @@ from PeriContoCoatedProductTree_gui import Ui_MainWindow
 from resources.pop_up_message_box import makeMessageBox
 from resources.resources_icons import roundButton
 from resources.ui_string_dialog_impl import UI_String
+
+
 
 # from graphHAP import Graph
 
@@ -342,7 +350,7 @@ class PeriContoPyQtFrontEnd(QMainWindow):
     graph_ID = item.graph_ID
     return graph_ID, object, predicate, subject
 
-  @pyqtSlot(int)
+  # @pyqtSlot(int)
   def on_spinNumber_valueChanged(self, number):
     pass
 
@@ -400,4 +408,4 @@ if __name__ == "__main__":
 
   MainWindow = PeriContoPyQtFrontEnd()
   MainWindow.show()
-sys.exit(app.exec_())
+sys.exit(app.exec())

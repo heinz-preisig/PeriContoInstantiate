@@ -18,7 +18,7 @@ from PeriContoCoatedProductBackEnd import BackEnd
 from PeriContoCoatedProductBackEnd import DELIMITERS
 
 # from graphHAP import Graph
-from src.attic.PeriContoCoatedProduct_gui import Ui_MainWindow
+from PeriContoCoatedProduct_gui import Ui_MainWindow
 from resources.pop_up_message_box import makeMessageBox
 from resources.resources_icons import roundButton
 from resources.ui_string_dialog_impl import UI_String

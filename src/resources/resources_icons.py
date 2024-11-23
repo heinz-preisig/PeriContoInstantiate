@@ -72,6 +72,7 @@ def roundButton(button, what, tooltip=None, mysize=None):
   button.setIconSize(BUTTON_ICON_SIZE)
   button.setToolTip(tooltip)
 
+
 def getIcon(what):
   try:
     what in ICONS.keys()
@@ -79,30 +80,13 @@ def getIcon(what):
     print("assertation error %s is not in the icon dictionary" % what)
     os.exit()
 
-  # f_name = os.path.join(REPOSITORIES["icon_location"], ICONS[what])
   f_name = os.path.join(os.getcwd(), 'resources', "icons", ICONS[what])
   # print("debugging .....", f_name)
   if os.path.exists(f_name):
-    pm = QtGui.QPixmap(f_name)
-    return QtGui.QIcon(pm)
+    # pm = QtGui.QPixmap(f_name)
+    icon = QtGui.QIcon(f_name)
+
+    return icon #QtGui.QIcon(pm)
   else:
     print("no such file : ", f_name)
     pass
-
-# def getIcon(what):
-#   try:
-#     what in ICONS.keys()
-#   except:
-#     print("assertation error %s is not in the icon dictionary" % what)
-#     os.exit()
-#
-#   f_name = os.path.join(os.getcwd(), 'resources', "icons", ICONS[what])
-#   # print("debugging .....", f_name)
-#   if os.path.exists(f_name):
-#     # pm = QtGui.QPixmap(f_name)
-#     icon = QtGui.QIcon(f_name)
-#
-#     return icon #QtGui.QIcon(pm)
-#   else:
-#     print("no such file : ", f_name)
-#     pass

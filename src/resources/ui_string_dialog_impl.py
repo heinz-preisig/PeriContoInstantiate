@@ -24,8 +24,8 @@ from PyQt6 import QtWidgets
 
 
 # from ui_string_dialog import  Ui_Dialog
-from ui_string_dialog import Ui_Dialog
-from resources_icons import roundButton
+from resources.ui_string_dialog import Ui_Dialog
+from resources.resources_icons import roundButton
 
 
 class UI_String(QtWidgets.QDialog):

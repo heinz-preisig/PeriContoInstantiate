@@ -9,9 +9,22 @@ an instantiated "node" is <<name>>:<<ID>>
 """
 import pprint
 
+
+import glob
+import os
+import sys
+
 import copy
 import os.path
 from rdflib.plugins.stores.memory import Memory
+
+# from rdflib import namespace
+
+
+root = os.path.abspath(os.path.join("."))
+sys.path.extend([root, os.path.join(root, "resources")])
+
+
 
 DELIMITERS = {"instantiated": ":",
               "path"        : "/"}
@@ -21,7 +34,7 @@ COATING_ONTOLOGY_URI = 'http://example.org/'
 # from rdflib import Graph
 # from rdflib import Literal
 
-from rdflib import Namespace, Literal, URIRef
+from rdflib import Namespace, Literal, URIRef, namespace
 from rdflib.graph import Graph, ConjunctiveGraph
 # from rdflib.plugins.stores.memory import Memory
 from rdflib.namespace import RDF, XSD, RDFS
@@ -402,10 +415,24 @@ class SuperGraph():
     load conjunctive graph from json file and
     """
     self.JsonFile = JsonFile
-    data = getData(self.JsonFile)
+
+    # self.project_name = os.path.basename(self.project_file_spec).split(os.path.extsep)[0]
+
+    data = ConjunctiveGraph("Memory")
+    data.parse(JsonFile, format="trig") #FILE_FORMAT)
+
+    
+
+    RDFS = namespace.RDFS
+    for t in data.triples((None, None, None)):
+      s, p, o = t
+      if o == RDFS.Class:
+        print(t)
+        
+    # data = getData(self.JsonFile)
     
     #print the locaded JSON data
-    pprint.pprint(data)
+    # pprint.pprint(data)
 
 
     self.txt_root_class = data["root"]
@@ -920,11 +947,11 @@ class WorkingTree(SuperGraph):
     class_names = list(self.RDFConjunctiveGraph.keys())
     dot = plotQuads(graph_overall, class_names)
     graph_name = self.txt_root_class
-    dot.render(graph_name, directory=ONTOLOGY_DIRECTORY, view=True)
-    if not os.path.exists(os.path.join(ONTOLOGY_DIRECTORY, "legend.pdf")):
+    dot.render(graph_name, directory=ONTOLOGY_REPOSITORY, view=True)
+    if not os.path.exists(os.path.join(ONTOLOGY_REPOSITORY, "legend.pdf")):
       # TODO: add button for legend
       leg = LegendPlot()
-      leg.render("legend", directory=ONTOLOGY_DIRECTORY, view=True)
+      leg.render("legend", directory=ONTOLOGY_REPOSITORY, view=True)
     return dot
 
   def collectGraphs(self):
@@ -1057,8 +1084,8 @@ class BackEnd:
 
     self.FrontEnd.fileNameDialogOpen(state, "file_name",
                                  "ontology",
-                                 ONTOLOGY_DIRECTORY,
-                                 "*.json",
+                                 ONTOLOGY_REPOSITORY,
+                                 "*",
                                  "exit")
 
   def __askForFileNameKnowledgeGraphLoading(self):
@@ -1069,8 +1096,8 @@ class BackEnd:
 
     self.FrontEnd.fileNameDialogOpen(state, "file_name",
                                  "instantiate knowledge graph",
-                                 ONTOLOGY_DIRECTORY,
-                                 "*.ttl",
+                                 ONTOLOGY_REPOSITORY,
+                                 "*",
                                  "exit")
 
   def __askForFileNameSaving(self):
@@ -1081,7 +1108,7 @@ class BackEnd:
 
     self.FrontEnd.fileNameDialogSave(state, "file_name",
                                  "ontology",
-                                 ONTOLOGY_DIRECTORY,
+                                 ONTOLOGY_REPOSITORY,
                                  "*.ttl",
                                  "exit")
 
@@ -1099,7 +1126,7 @@ class BackEnd:
     global current_event_data
     filename_save = current_event_data["file_name"]
 
-    self.ttlFile = os.path.join(ONTOLOGY_DIRECTORY, filename_save)
+    self.ttlFile = os.path.join(ONTOLOGY_REPOSITORY, filename_save)
     print('printing filepath to save ttl..', self.ttlFile)
     current_kg = self.ContainerGraph.to_rdflibConjunctiveGraph()
     
@@ -1144,7 +1171,7 @@ class BackEnd:
     file_name = current_event_data["file_name"]# "new.ttl"
     data = open(file_name)
     g = ConjunctiveGraph()
-    g.parse(data, format="turtle")
+    g.parse(data, format="trig")
 
     self.__askForFileNameOpening()
     self.__loadOntology()
