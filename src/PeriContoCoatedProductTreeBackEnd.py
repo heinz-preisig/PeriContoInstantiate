@@ -556,7 +556,7 @@ class SuperGraph():
       print(stack)
       id = stack[0]
       stack = stack[1:]
-      while id in visited:
+      if id in visited:
         if not stack:
           break
         id = stack[0]
