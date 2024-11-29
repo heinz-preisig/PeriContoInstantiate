@@ -943,7 +943,7 @@ class WorkingTree(SuperGraph):
     extract an RDF-subgraph from an RDF-Graph given a root as a string, a label
     it is done via the quads generation that ignore the directionality
     """
-    quads = convertRDFintoInternalMultiGraph(self.container_graph.RDFConjunctiveGraph[graph_ID], graph_ID)
+    quads = convertRDFintoInternalMultiGraph(self.container_graph.RDFGraphDictionary[graph_ID], graph_ID)
     extracts = []  #TODO: add button for legend
     extractSubTree(quads, root, extracts)  # as quads
     graph = convertQuadsGraphIntoRDFGraph(extracts)
@@ -959,7 +959,7 @@ class WorkingTree(SuperGraph):
     return graph, linked_classes
 
   def getLinkedGraphs(self, c_current, linked_classes, stack=[]):
-    graph = self.container_graph.RDFConjunctiveGraph[c_current]
+    graph = self.container_graph.RDFGraphDictionary[c_current]
     stack.append(c_current)
     for s,p,o in graph.triples((None, RDFSTerms["link_to_class"],None)):
       c_next = getID(str(s))
@@ -1133,7 +1133,7 @@ class BackEnd:
     
 
     self.working_tree = WorkingTree(self.ContainerGraph)
-    self.txt_class_names = list(self.working_tree.container_graph.RDFConjunctiveGraph.keys())
+    self.txt_class_names = list(self.working_tree.container_graph.RDFGraphDictionary.keys())
 
     self.current_class = self.root_class_container
 

@@ -29,7 +29,7 @@ sys.path.extend([root, os.path.join(root, "resources")])
 DELIMITERS = {"instantiated": ":",
               "path"        : "/"}
 #A temperary URI for our coating ontology              
-COATING_ONTOLOGY_URI = 'http://example.org/'
+BASE = 'http://example.org/'
 
 # from rdflib import Graph
 # from rdflib import Literal
@@ -45,18 +45,41 @@ from treeid import ObjectTreeNonUniqueTags, invertDict
 # from graphviz import Digraph
 import graphviz
 
-from PeriConto import MYTerms
-from PeriConto import ONTOLOGY_REPOSITORY
-from PeriConto import PRIMITIVES
-from PeriConto import RDFSTerms
+# from PeriConto import MYTerms
+# from PeriConto import ONTOLOGY_REPOSITORY
+# from PeriConto import PRIMITIVES
+# from PeriConto import RDFSTerms
 # from PeriConto import VALUE
 # from PeriConto import getData, saveWithBackup
 # from PeriConto import makeRDFCompatible
 # from PeriConto import DIRECTION
 
+
+ONTOLOGY_REPOSITORY = "../ontologyRepository"
+
+PRIMITIVES = ["string", "integer", "decimal",  "boolean", "aniURI"]
+
+RDFSTerms = {
+        "Class"        : RDFS.Class,
+        "type"     : RDF.type,  # was "is_type"
+        "member"    : RDFS.member,
+        "isDefinedBy": RDFS.isDefinedBy,
+        "value"        : RDF.value,
+        "Datatype"    : RDFS.Datatype,
+        "comment"      : RDFS.comment,
+        "integer"      : XSD.integer,
+        "string"       : XSD.string,
+        "decimal"      : XSD.decimal,
+        "anyURI"          : XSD.anyURI,
+        "label"         : RDFS.label,
+        "boolean"      : XSD.boolean,
+        }
+
+MYTerms = {v: k for k, v in RDFSTerms.items()} # reverse dictionary
+
 EDGE_COLOUR = {
-        "is_a_subclass_of": "blue",
-        "link_to_class"   : "red",
+        "member": "blue",
+        "isDefinedBy"   : "red",
         "value"           : "black",
         "comment"         : "green",
         "integer"         : "darkorange",
@@ -65,8 +88,8 @@ EDGE_COLOUR = {
 
 NODE_COLOUR = {
         "root": "red",
-        "sub_class": "white",
-        "linked_class": "red",
+        "member": "white",
+        "isDefinedBy": "red",
         "primitive": "green",
         "value": "lightblue",
         "comment": "green",
@@ -102,6 +125,13 @@ NODE_SHAPE = {
         "default" : "box",
         }
 
+def makeRDFCompatible(identifier):  # TODO remove
+#   """
+#   To be adapted to imported notation.
+#   For now it generates rdflib Literals
+#   """
+  return Literal(identifier)
+
 
 def copyRDFGraph(G_original):
   G_copy = Graph()
@@ -111,15 +141,15 @@ def copyRDFGraph(G_original):
 
 def nodeTypeMembership(node_types, node_tag):
   node_original = getID(node_tag)
-  is_root = node_original in node_types["root"]
-  is_data_class = node_original in node_types["link_to_class"]
+  is_root = node_original in node_types["ROOT"]
+  is_data_class = node_original in node_types["isDefinedBy"]
   # is_container_class = node in self.node_types[]
-  is_sub_class = node_original in node_types["is_a_subclass_of"]
+  is_sub_class = node_original in node_types["member"]
   is_primitive = node_original in PRIMITIVES
   is_value = node_original in node_types["value"]
   is_comment = node_original in node_types["comment"]
-  is_integer = node_original in node_types["integer"]
-  is_string = node_original in node_types["string"]
+  is_integer = node_original == "integer"
+  is_string = node_original == "string"
   # is_linked = node_original in node_types["(predicate == "link_to_class")
   is_instantiated_object = DELIMITERS["instantiated"] in node_tag
   return is_root,\
@@ -343,7 +373,7 @@ def convertRDFintoInternalMultiGraph(graph, graph_ID):
     s = str(subject)
     p = MYTerms[predicate]
     o = str(object_)
-    if p not in ["value"] + PRIMITIVES:
+    if p not in ["value","isDefinedBy","Datatype"] :
       quads.append((s, o, p, graph_ID))
     else:
       quads.append((o, s, p, graph_ID))
@@ -354,12 +384,22 @@ def convertRDFintoInternalMultiGraph(graph, graph_ID):
 def convertQuadsGraphIntoRDFGraph(quads):
   graph = Graph()
   for f, s, p, graphID in quads:
-    if p not in ["value"] + PRIMITIVES:
+    if p not in ["value","isDefinedBy"] + PRIMITIVES:
       graph.add((Literal(f), RDFSTerms[p], Literal(s)))
     else:
       graph.add((Literal(s), RDFSTerms[p], Literal(f)))
   print('debugging...printed rdf graph:', graph)
   return graph
+
+def extractClassName(iri):
+  return str(iri).split("/")[-1]
+
+def extractItemName(iri):
+  if "#" not in str(iri):
+    return None
+  else:
+    _, item = str(iri).split("#")
+    return item
 
 
 def extractSubTree(quads, root, extracts=[], stack=[]):
@@ -395,13 +435,13 @@ class SuperGraph():
     self.txt_comment_lists = {}
     self.enumerators = {}
 
-    self.RDFConjunctiveGraph = {}
+    self.RDFGraphDictionary = {}
 
     pass
 
   def create(self, root_class):
     self.txt_root_class = root_class
-    self.RDFConjunctiveGraph = {self.txt_root_class: Graph('Memory', identifier=root_class)}
+    self.RDFGraphDictionary = {self.txt_root_class: Graph('Memory', identifier=root_class)}
     self.txt_subclass_names[self.txt_root_class] = [self.txt_root_class]
     self.txt_class_names.append(self.txt_root_class)
     self.txt_class_path = [self.txt_root_class]
@@ -421,13 +461,38 @@ class SuperGraph():
     data = ConjunctiveGraph("Memory")
     data.parse(JsonFile, format="trig") #FILE_FORMAT)
 
-    
+    self.conjunctiveGraph = data
 
+    txt_class_names = set()
+    classes = set()
+    rdfclasses = set()
     RDFS = namespace.RDFS
-    for t in data.triples((None, None, None)):
-      s, p, o = t
+    for s,p,o,g in data.quads((None, None, None, None)):
       if o == RDFS.Class:
-        print(t)
+        print(extractClassName(s))
+        txt_class_names.add(extractClassName(s))
+        classes.add(extractClassName(s))
+        rdfclasses.add(s)
+
+    # self.namespaces = {}
+    for g in classes:
+      # self.namespaces[g] = Namespace(g)
+      self.RDFGraphDictionary[g]= Graph()
+
+    for s,p,o,g in data.quads((None,None,None,None)):
+      if o not in RDFS.Class:
+        s_name = extractItemName(s)
+        p_name = extractItemName(p)
+        o_name = extractItemName(o)
+        g_name = extractClassName(g).split(">")[0]
+        if not o_name:
+          # g_name = extractClassName(g).split(">")[0]
+          o_name = g_name.split("/")[-1]
+        self.addGraphGivenInInternalNotation(s_name, p_name, o_name, g_name)
+
+    self.txt_class_names = txt_class_names
+
+
         
     # data = getData(self.JsonFile)
     
@@ -435,22 +500,31 @@ class SuperGraph():
     # pprint.pprint(data)
 
 
-    self.txt_root_class = data["root"]
-    self.txt_elucidations = data["elucidations"]
+    self.txt_root_class = "ROOT" #data["root"]
+    self.txt_elucidations = {} #data["elucidations"]
+    for g in self.txt_class_names:
+      self.class_definition_sequence.append(g) # todo: that goes wrong -- used?
 
-    graphs_internal = data["graphs"]
-    for g in graphs_internal:
-      self.class_definition_sequence.append(g)
-      self.txt_class_names.append(g)
       self.txt_subclass_names[g] = []
       self.txt_primitives[g] = {g: []}
       self.txt_link_lists[g] = []
-      # Note: defines the graph in a conjunctive graph. The rdflib.graph.ConjunctiveGraph seems to
-      # Note:  show discrepancies between python implementation and documentation. Tried .get_graph
-      self.RDFConjunctiveGraph[g] = Graph()
+      # self.RDFGraphDictionary[g] = Graph()
+    #
+    # graphs_internal = data["graphs"]
+    # for g in graphs_internal:
+    #   self.class_definition_sequence.append(g)
+    #   self.txt_class_names.append(g)
+    #   self.txt_subclass_names[g] = []
+    #   self.txt_primitives[g] = {g: []}
+    #   self.txt_link_lists[g] = []
+    #   # Note: defines the graph in a conjunctive graph. The rdflib.graph.ConjunctiveGraph seems to
+    #   # Note:  show discrepancies between python implementation and documentation. Tried .get_graph
+    #   self.RDFGraphDictionary[g] = Graph()
+    #
+    #   for s, p, o in graphs_internal[g]:
+    #     self.addGraphGivenInInternalNotation(s, p, o, g)
 
-      for s, p, o in graphs_internal[g]:
-        self.addGraphGivenInInternalNotation(s, p, o, g)
+
 
     self.knowledge_tree, self.node_types = self.makeTreeRepresentation()
 
@@ -460,13 +534,13 @@ class SuperGraph():
 
   def makeTreeRepresentation(self):
     graph_overall = self.collectGraphs()
-    quads = convertRDFintoInternalMultiGraph(graph_overall, 'all')
+    quads = convertRDFintoInternalMultiGraph(graph_overall, "ROOT")#'ROOT')
     tree = ObjectTreeNonUniqueTags(self.txt_root_class)
     self.recurseTree(tree, self.txt_root_class, quads)
     # print("debugging -- generating tree")
 
-    types = {"root" : self.txt_root_class}
-    for t in RDFSTerms:
+    types = {"ROOT" : self.txt_root_class}
+    for t in list(RDFSTerms.keys() - PRIMITIVES):
       types[t]= set()
     for s,o,p,g in quads:
       types[p].add(s)
@@ -475,13 +549,21 @@ class SuperGraph():
     return tree, types
 
   def recurseTree(self, tree, id, quads):
+    """
+    recurse and handle loops
+    """
 
-    # nodes = []
+    visited = set()
     stack = [id]
     while stack:
-      # cur_node = stack[0]
+      print(stack)
       id = stack[0]
       stack = stack[1:]
+      while id in visited:  # handle loops
+        if not stack:
+          break
+        id = stack[0]
+        stack = stack[1:]
       # nodes.append(cur_node)
       children = []
       for s,o,p,g in quads:
@@ -489,25 +571,38 @@ class SuperGraph():
           children.append(str(s))
       for child in reversed(children):  # .get_rev_children():
         tree.addChildtoNode(child, id)
-        stack.insert(0, child)
+        if child not in stack:
+          stack.insert(0, child)
+      pass
+      visited.add(id)
 
 
 
   def collectGraphs(self):
     graph_overall = Graph()
-    for cl in self.RDFConjunctiveGraph:
+    for cl in self.RDFGraphDictionary:
       # print('debugging.....', cl)
-      for t in self.RDFConjunctiveGraph[cl].triples((None, None, None)):
+      for t in self.RDFGraphDictionary[cl].triples((None, None, None)):
         # print('debugging...', t)
         s, p, o = t
         graph_overall.add(t)
     return graph_overall
 
 
+  def makeURI(self, Class, identifier):
+    uri = URIRef(self.namespaces[Class] + "#" + identifier)
+        # print("uri: ", identifier, "-->", uri)
+    return uri
+
+  def makeClassURI(self, Class):
+    uid = "%s/%s" % (BASE, Class)
+    uris = URIRef(uid)
+    return uid, uris
+
   def makeAllListsForAllGraphs(self):
     # print("debugging")
-    for rdf_graph_ID in self.RDFConjunctiveGraph:
-      rdf_graph = self.RDFConjunctiveGraph[rdf_graph_ID]
+    for rdf_graph_ID in self.RDFGraphDictionary:
+      rdf_graph = self.RDFGraphDictionary[rdf_graph_ID]
       self.makeAllListsForOneGraph(rdf_graph, rdf_graph_ID)
     pass
 
@@ -523,19 +618,19 @@ class SuperGraph():
     rdf_subject = makeRDFCompatible(subject_internal)
     rdf_object = makeRDFCompatible(object_internal)
     rdf_predicate = RDFSTerms[predicate_internal]
-    self.RDFConjunctiveGraph[graph_ID].add((rdf_subject, rdf_predicate, rdf_object))
+    self.RDFGraphDictionary[graph_ID].add((rdf_subject, rdf_predicate, rdf_object))
 
   def printMe(self, text):
 
-    for g in list(self.RDFConjunctiveGraph.keys()):
+    for g in list(self.RDFGraphDictionary.keys()):
       print("\n %s %s" % (text, g))
-      for s, p, o in self.RDFConjunctiveGraph[g].triples((None, None, None)):
+      for s, p, o in self.RDFGraphDictionary[g].triples((None, None, None)):
         print("- ", str(s), MYTerms[p], str(o))
 
   def to_rdflibConjunctiveGraph(self):
 
     # Define a namespace for our coating knowledge graph and link the URI 
-    ckg = Namespace(COATING_ONTOLOGY_URI)
+    ckg = Namespace(BASE)
     print("....debugging...", ckg)
     kg_store = Memory()
     kg = ConjunctiveGraph(store=kg_store) #kg_store)
@@ -551,13 +646,13 @@ class SuperGraph():
     # print("===================")
 
       
-    for subgraph_key in list(self.RDFConjunctiveGraph.keys()):
+    for subgraph_key in list(self.RDFGraphDictionary.keys()):
 
       # print("printing the subgraph identifier....", subgraph_key)
       print(".....URI of subgraph", ckg[subgraph_key])
       print("=================================")
       subgraph = Graph(identifier=subgraph_key, store=kg_store) #store=kg_store, identifier=subgraph_key)
-      for s, p, o in self.RDFConjunctiveGraph[subgraph_key].triples((None, None, None)):
+      for s, p, o in self.RDFGraphDictionary[subgraph_key].triples((None, None, None)):
         subgraph.add((ckg[s], p, ckg[o]))
         # print(p)
         print(ckg[s], p, ckg[o])
@@ -587,7 +682,7 @@ class SuperGraph():
     return text_ID in PRIMITIVES
 
   def isValue(self, predicate):
-    return predicate == VALUE
+    return predicate == "value"
 
   def isInteger(self, predicate):
     return predicate == "integer"
@@ -609,7 +704,7 @@ class SuperGraph():
 # No, this does not work!
 #It should be a rdflib's ConjunctiveGraph for serialization to work.
   def rdfSerializer(self, format):
-    return self.RDFConjunctiveGraph.serialize(format)
+    return self.RDFGraphDictionary.serialize(format)
 
 
 def makeListBasedOnPredicates(rdf_graph, rdf_predicate):
@@ -634,13 +729,14 @@ class ContainerGraph(SuperGraph):
                         # "nodes_in_classes": {}}
     pass
 
-  def load(self, JsonFile):
-    super().load(JsonFile)
-    for class_ID in self.RDFConjunctiveGraph:
+  def loadData(self, JsonFile):
+    # super().load(JsonFile)
+    self.load(JsonFile)
+    for class_ID in self.RDFGraphDictionary:
 
       # self.enumerators["classes"][class_ID] = -1
       # self.enumerators["nodes_in_classes"][class_ID] = {}
-      for s, p, o in self.RDFConjunctiveGraph[class_ID]:
+      for s, p, o in self.RDFGraphDictionary[class_ID]:
         self.enumerators[str(s)] = -1
         self.enumerators[str(o)] = -1
       #   self.enumerators["nodes_in_classes"][class_ID][str(o)] = -1  # instantiate enumerators
@@ -751,7 +847,7 @@ class WorkingTree(SuperGraph):
     # we start at the end, where the primitive was just instantiated
     c = class_path[-1]
     c_original = getID(c)
-    from_graph = copy.deepcopy(self.RDFConjunctiveGraph[c])
+    from_graph = copy.deepcopy(self.RDFGraphDictionary[c])
 
     debuggPrintGraph(from_graph, debug, text="starting")
     # print("debugging -- >>>>>>>>>>>> ", class_path, c)
@@ -824,7 +920,7 @@ class WorkingTree(SuperGraph):
     if c in instantiated[c_original]:
       c_store = instantiated[c_original][c]
       # del self.RDFConjunctiveGraph[c]  # todo: here it is deleted
-      self.RDFConjunctiveGraph[c_store] = from_graph
+      self.RDFGraphDictionary[c_store] = from_graph
       # print("debugging -- put the graph into to conjunctive graph")
       index = class_path.index(c)
       class_path[index] = c_store
@@ -841,7 +937,7 @@ class WorkingTree(SuperGraph):
     paths_in_classes[c_i] = t
 
     if stop:
-      self.RDFConjunctiveGraph[c_store] = from_graph
+      self.RDFGraphDictionary[c_store] = from_graph
       return class_path, paths_in_classes
 
     ### end of the first class, the class where the instantiation took place, being modified
@@ -856,7 +952,7 @@ class WorkingTree(SuperGraph):
       # print("debugging -- >>>>>>>>>>>> ", class_path, c)
       nodes = paths_in_classes[c].split(DELIMITERS["path"])
       linked_to_node = nodes[-2]
-      from_graph = copy.deepcopy(self.RDFConjunctiveGraph[c])
+      from_graph = copy.deepcopy(self.RDFGraphDictionary[c])
 
       debuggPrintGraph(from_graph, debug, text= "before handling the links")
 
@@ -913,9 +1009,9 @@ class WorkingTree(SuperGraph):
         c_store = c_i
         instantiated[c][c] = c_i
         # del instantiated[c]
-        del self.RDFConjunctiveGraph[c]
+        del self.RDFGraphDictionary[c]
 
-      self.RDFConjunctiveGraph[c_store] = from_graph
+      self.RDFGraphDictionary[c_store] = from_graph
 
       if not isInstantiated(c):
         c_i = instantiated[c][c]
@@ -944,7 +1040,7 @@ class WorkingTree(SuperGraph):
 
   def makeRDFDotGraph(self):
     graph_overall = self.collectGraphs()
-    class_names = list(self.RDFConjunctiveGraph.keys())
+    class_names = list(self.RDFGraphDictionary.keys())
     dot = plotQuads(graph_overall, class_names)
     graph_name = self.txt_root_class
     dot.render(graph_name, directory=ONTOLOGY_REPOSITORY, view=True)
@@ -956,8 +1052,8 @@ class WorkingTree(SuperGraph):
 
   def collectGraphs(self):
     graph_overall = Graph()
-    for cl in self.RDFConjunctiveGraph:
-      for t in self.RDFConjunctiveGraph[cl].triples((None, None, None)):
+    for cl in self.RDFGraphDictionary:
+      for t in self.RDFGraphDictionary[cl].triples((None, None, None)):
         s, p, o = t
         graph_overall.add(t)
     # class_names = list(self.RDFConjunctiveGraph.keys())
@@ -970,7 +1066,7 @@ class WorkingTree(SuperGraph):
     extract an RDF-subgraph from an RDF-Graph given a root as a string, a label
     it is done via the quads generation that ignore the directionality
     """
-    quads = convertRDFintoInternalMultiGraph(self.container_graph.RDFConjunctiveGraph[graph_ID], graph_ID)
+    quads = convertRDFintoInternalMultiGraph(self.container_graph.RDFGraphDictionary[graph_ID], graph_ID)
     extracts = []  #TODO: add button for legend
     extractSubTree(quads, root, extracts)  # as quads
     graph = convertQuadsGraphIntoRDFGraph(extracts)
@@ -986,7 +1082,7 @@ class WorkingTree(SuperGraph):
     return graph, linked_classes
 
   def getLinkedGraphs(self, c_current, linked_classes, stack=[]):
-    graph = self.container_graph.RDFConjunctiveGraph[c_current]
+    graph = self.container_graph.RDFGraphDictionary[c_current]
     stack.append(c_current)
     for s,p,o in graph.triples((None, RDFSTerms["link_to_class"],None)):
       c_next = getID(str(s))
@@ -1152,7 +1248,7 @@ class BackEnd:
     file_name = current_event_data["file_name"]
 
     event_data = current_event_data
-    self.root_class_container = self.ContainerGraph.load(file_name)
+    self.root_class_container = self.ContainerGraph.loadData(file_name)
 
 
     self.ContainerGraph.printMe("loaded")
@@ -1160,7 +1256,7 @@ class BackEnd:
     
 
     self.working_tree = WorkingTree(self.ContainerGraph)
-    self.txt_class_names = list(self.working_tree.container_graph.RDFConjunctiveGraph.keys())
+    self.txt_class_names = list(self.working_tree.container_graph.RDFGraphDictionary.keys())
 
     self.current_class = self.root_class_container
 
@@ -1201,42 +1297,49 @@ class BackEnd:
 
     node_original = getID(node_tag)
 
-    is_root, \
-    is_comment, \
-    is_data_class, \
-    is_instantiated_object, \
-    is_integer, \
-    is_primitive, \
-    is_string, \
-    is_sub_class, \
-    is_value= nodeTypeMembership(self.working_tree.container_graph.node_types, node_tag)
+    # is_root, \
+    # is_comment, \
+    # is_data_class, \
+    # is_instantiated_object, \
+    # is_integer, \
+    # is_primitive, \
+    # is_string, \
+    # is_sub_class, \
+    # is_value= nodeTypeMembership(self.working_tree.container_graph.node_types, node_tag)
 
-    debugging = True
-    if debugging:
-      txt = "selection has data: %s    " % current_event_data
-      if is_data_class: txt += " & class"
-      # if is_container_class: txt += " & container_class"
-      if is_sub_class: txt += " & subclass"
-      if is_primitive: txt += " & primitive"
-      if is_value: txt += " & value"
-      # if is_linked: txt += " & is_linked"
-      if is_instantiated_object: txt += " & instantiated"
-      if is_integer: txt += " & integer"
-      if is_comment: txt += " & comment"
-      if is_string: txt += " & string"
-      # print("selection : %s\n" % txt)
+    # debugging = True
+    # if debugging:
+    #   txt = "selection has data: %s    " % current_event_data
+    #   if is_data_class: txt += " & class"
+    #   # if is_container_class: txt += " & container_class"
+    #   if is_sub_class: txt += " & subclass"
+    #   if is_primitive: txt += " & primitive"
+    #   if is_value: txt += " & value"
+    #   # if is_linked: txt += " & is_linked"
+    #   if is_instantiated_object: txt += " & instantiated"
+    #   if is_integer: txt += " & integer"
+    #   if is_comment: txt += " & comment"
+    #   if is_string: txt += " & string"
+    #   # print("selection : %s\n" % txt)
 
-    if is_primitive:
-      if not is_instantiated_object:
-        if is_integer:
+    if node_tag in PRIMITIVES:
+      if not DELIMITERS["instantiated"] in node_tag:
+        if node_tag == "string":
+          self.ui_state("instantiate_string")
+        elif node_tag == "integer":
           self.ui_state("instantiate_integer")
-        elif is_string:
+        elif node_tag == "decimal":
+          self.ui_state("instantiate_integer")
+        elif node_tag == "boolean":
+          self.ui_state("instantiate_boolean")
+        elif node_tag == "anyURI":
           self.ui_state("instantiate_string")
         else:
           self.ui_state("show_tree")
         return
 
-    if is_sub_class and  is_instantiated_object:
+    types = self.working_tree.container_graph.node_types
+    if (node_tag in types["isDefinedBy"]) and  (DELIMITERS["instantiated"] in node_tag):
 
       # exctract from the working tree to check if one can add a branch
       parent_ID = self.working_tree.tree["tree"].getImmediateParent(node_ID)
@@ -1445,9 +1548,10 @@ class BackEnd:
     global action
     # global data_container
 
-    show_automaton = False
+    show_automaton = True
 
     current_event_data = event_data
+    print(">>>>>>>>>>>>>>>>>>>>",state,Event,event_data)
 
     if state not in self.automaton:
       print("stopping here - no such state", state)

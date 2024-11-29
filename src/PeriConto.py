@@ -69,17 +69,17 @@ FILE_FORMAT = "trig"
 #         # "type"            : RDF.type,
 #         }
 RDFSTerms = {
-        "class"        : RDFS.Class,
-        "is_class"     : RDF.type,  # was "is_type"
-        "is_member"    : RDFS.member,
-        "is_defined_by": RDFS.isDefinedBy,
+        "Class"        : RDFS.Class,
+        "type"     : RDF.type,  # was "is_type"
+        "member"    : RDFS.member,
+        "isDefinedBy": RDFS.isDefinedBy,
         "value"        : RDF.value,
-        "data_type"    : RDFS.Datatype,
+        "Datatype"    : RDFS.Datatype,
         "comment"      : RDFS.comment,
         "integer"      : XSD.integer,
         "string"       : XSD.string,
         "decimal"      : XSD.decimal,
-        "uri"          : XSD.anyURI,
+        "anyURI"          : XSD.anyURI,
         "label"         : RDFS.label,
         "boolean"      : XSD.boolean,
         }
@@ -353,7 +353,7 @@ class DataModel():
     self.GRAPHS[Class].bind(Class, self.namespaces[Class])
 
     sub = URIRef(uid)
-    triple = (sub, RDFSTerms["is_class"], RDFSTerms["class"])
+    triple = (sub, RDFSTerms["type"], RDFSTerms["Class"])
     self.GRAPHS[Class].add(triple)
     return self.getClassNamesList()
 

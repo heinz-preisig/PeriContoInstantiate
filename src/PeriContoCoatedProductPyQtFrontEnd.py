@@ -340,6 +340,7 @@ class PeriContoPyQtFrontEnd(QMainWindow):
     message = {"reversed_path": self.reversed_path,
                "node_tag"         : item.text(0),
                "node_ID" : item.node_id}
+    # print(">>>", message)
     self.backEnd.processEvent("show_tree", "selected", message)
 
   def __getItemInfo(self, item):

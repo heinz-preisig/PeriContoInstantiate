@@ -433,8 +433,8 @@ class WorkingTree(SuperGraph):
     ### oops does not work!
     # self.RDFConjunctiveGraph = copy.deepcopy(container_graph.RDFConjunctiveGraph)
     self.RDFConjunctiveGraph = {}
-    for c in container_graph.RDFConjunctiveGraph:
-      G_original = container_graph.RDFConjunctiveGraph[c]
+    for c in container_graph.RDFGraphDictionary:
+      G_original = container_graph.RDFGraphDictionary[c]
       self.RDFConjunctiveGraph[c] = copyRDFGraph(G_original)
 
     # self.printMe("copied into the working tree")
@@ -670,7 +670,7 @@ class WorkingTree(SuperGraph):
     extract an RDF-subgraph from an RDF-Graph given a root as a string, a label
     it is done via the quads generation that ignore the directionality
     """
-    quads = convertRDFintoInternalMultiGraph(self.container_graph.RDFConjunctiveGraph[graph_ID], graph_ID)
+    quads = convertRDFintoInternalMultiGraph(self.container_graph.RDFGraphDictionary[graph_ID], graph_ID)
     extracts = []  #TODO: add button for legend
     extractSubTree(quads, root, extracts)  # as quads
     graph = convertQuadsGraphIntoRDFGraph(extracts)
@@ -686,7 +686,7 @@ class WorkingTree(SuperGraph):
     return graph, linked_classes
 
   def getLinkedGraphs(self, c_current, linked_classes, stack=[]):
-    graph = self.container_graph.RDFConjunctiveGraph[c_current]
+    graph = self.container_graph.RDFGraphDictionary[c_current]
     stack.append(c_current)
     for s,p,o in graph.triples((None, RDFSTerms["link_to_class"],None)):
       c_next = getID(str(s))
@@ -799,7 +799,7 @@ class BackEnd:
     self.ContainerGraph.printMe("loaded")
 
     self.working_tree = WorkingTree(self.ContainerGraph)
-    self.txt_class_names = list(self.working_tree.container_graph.RDFConjunctiveGraph.keys())
+    self.txt_class_names = list(self.working_tree.container_graph.RDFGraphDictionary.keys())
 
     self.current_class = self.root_class_container
 
@@ -879,11 +879,11 @@ class BackEnd:
 
     # print("debugging -- linked_classes", linked_classes)
 
-    w_graph= self.working_tree.RDFConjunctiveGraph[self.current_class] + sub_graph
+    w_graph= self.working_tree.RDFGraphDictionary[self.current_class] + sub_graph
 
     debuggPlotAndRender(w_graph, "wg_extended", debug_plot)
 
-    debuggPrintGraph(self.working_tree.RDFConjunctiveGraph[self.current_class], debug_print)
+    debuggPrintGraph(self.working_tree.RDFGraphDictionary[self.current_class], debug_print)
     debuggPrintGraph(w_graph, debug_print)
 
     for s, p, o in w_graph.triples(
@@ -892,12 +892,12 @@ class BackEnd:
       to_connect = getID(self.current_node)
       w_graph.add((Literal(root), p, Literal(str(o))))
 
-    self.working_tree.RDFConjunctiveGraph[self.current_class] = w_graph
+    self.working_tree.RDFGraphDictionary[self.current_class] = w_graph
 
     debuggPlotAndRender(w_graph, "wg_extended_linked", debug_plot)
 
     for c in linked_classes:
-      self.working_tree.RDFConjunctiveGraph[c] = copy.copy(self.working_tree.container_graph.RDFConjunctiveGraph[c])
+      self.working_tree.RDFGraphDictionary[c] = copy.copy(self.working_tree.container_graph.RDFGraphDictionary[c])
 
     self.__makeWorkingTree()
 
@@ -987,7 +987,7 @@ class BackEnd:
     global data_container
     global is_container_class
 
-    self.quads = convertRDFintoInternalMultiGraph(self.working_tree.RDFConjunctiveGraph[self.current_class],
+    self.quads = convertRDFintoInternalMultiGraph(self.working_tree.RDFGraphDictionary[self.current_class],
                                                   self.current_class)
 
     gugus = convertQuadsGraphIntoRDFGraph(self.quads)
